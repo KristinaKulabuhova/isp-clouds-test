@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/u2takey/ffmpeg-go"
 )
 
 func assertErr(t *testing.T, err error) {
@@ -221,57 +220,4 @@ func TestFindValue(t *testing.T) {
 		{"null", "test-assets/find-value-input.json", "/find?value=null", "test-assets/find-value-output-null.json", http.StatusOK},
 	}
 	runJSONReferenceSubtests(t, testCases, findValueHandle, "POST")
-}
-
-func TestConvertErrorCheck(t *testing.T) {
-	testCases := []testCaseWithRef{
-		{"faulty JSON", "test-assets/convert-input-fail.json", "/convert", "test-assets/convert-output-fail.json", http.StatusBadRequest},
-		{"wrong format", "test-assets/convert-input-wrong-format.json", "/convert", "test-assets/convert-output-wrong-format.json", http.StatusBadRequest},
-		{"not a string", "test-assets/convert-input-not-a-string.json", "/convert", "test-assets/convert-output-not-a-string.json", http.StatusBadRequest},
-		{"decode failure", "test-assets/convert-input-decode.json", "/convert", "test-assets/convert-output-decode.json", http.StatusBadRequest},
-		{"ffmpeg failure", "test-assets/convert-input-ffmpeg.json", "/convert", "test-assets/convert-output-ffmpeg.json", http.StatusBadRequest},
-	}
-	runJSONReferenceSubtests(t, testCases, convertHandle, "POST")
-}
-
-func TestConvert(t *testing.T) {
-	testCases := []struct {
-		name   string
-		in     string
-		ref    string
-		status int
-	}{
-		{"wav", "test-assets/convert-input-wav.json", "audio/raw/song.wav", http.StatusOK},
-		{"ogg", "test-assets/convert-input-ogg.json", "audio/raw/song.ogg", http.StatusOK},
-		{"flac", "test-assets/convert-input-flac.json", "audio/raw/song.flac", http.StatusOK},
-	}
-
-	for _, c := range testCases {
-		t.Run(c.name, func(t *testing.T) {
-			err := ffmpeg_go.Input(c.ref).
-				Output("out.tmp", ffmpeg_go.KwArgs{"c:v": "libmp3lame", "ac": 2, "b:a": "320k", "f": "mp3"}).
-				OverWriteOutput().ErrorToStdOut().Run()
-			assertErr(t, err)
-
-			out, err := os.Open("out.tmp")
-			assertErr(t, err)
-
-			converted, err := encodeBase64FromFile(out)
-			assertErr(t, err)
-
-			err = os.Remove(out.Name())
-			assertErr(t, err)
-
-			expected := "{\"mp3\": \"" + converted + "\"}"
-
-			data, err := os.ReadFile(c.in)
-			assertErr(t, err)
-
-			dataReader := strings.NewReader(string(data))
-			actual := performRequest(t, convertHandle, "/convert", "POST", c.status, dataReader)
-			if expected != actual {
-				t.Fatalf("invalid conversion")
-			}
-		})
-	}
 }

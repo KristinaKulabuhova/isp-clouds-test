@@ -8,7 +8,6 @@ API specification can be found [here](https://app.swaggerhub.com/apis-docs/fckxo
 
 ## Requirements
 - First of all, you need to [install](https://go.dev/doc/install) the Golang suite.
-- Then, you need to make sure you have the [ffmpeg](https://ffmpeg.org/download.html) installed. It is unlikely that it is not present on your PC already, if you are running any popular Linux distro.
 
 ## Building
 ```

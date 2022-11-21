@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/u2takey/ffmpeg-go"
 )
 
 func gracefulFail(w http.ResponseWriter, code int, errmsg string) {
@@ -254,67 +253,6 @@ func encodeBase64FromFile(file *os.File) (string, error) {
 	return encoded, nil
 }
 
-func convertHandle(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	jsonData, err := decodeJSON(r)
-	if err != nil {
-		gracefulFail(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	for _, format := range []string{"flac", "ogg", "wav"} {
-		encoded, ok := jsonData[format]
-		if !ok {
-			continue
-		}
-
-		if reflect.TypeOf(encoded).Kind() != reflect.String {
-			gracefulFail(w, http.StatusBadRequest, "not a base64")
-			return
-		}
-
-		encodedStr := encoded.(string)
-
-		in, err := os.CreateTemp("", "input")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		out, err := os.CreateTemp("", "output")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := decodeBase64ToFile(encodedStr, in); err != nil {
-			gracefulFail(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		if err := ffmpeg_go.Input(in.Name()).
-			Output(out.Name(), ffmpeg_go.KwArgs{"c:v": "libmp3lame", "ac": 2, "b:a": "320k", "f": "mp3"}).
-			OverWriteOutput().ErrorToStdOut().Run(); err != nil {
-			gracefulFail(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		if err := os.Remove(in.Name()); err != nil {
-			log.Fatal(err)
-		}
-
-		converted, err := encodeBase64FromFile(out)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := os.Remove(out.Name()); err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Fprintf(w, "{\"mp3\": \"%s\"}", converted)
-		return
-	}
-	gracefulFail(w, http.StatusBadRequest, "no audio data provided")
-}
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	rand.Seed(time.Now().UnixNano())
@@ -323,7 +261,6 @@ func main() {
 	router.POST("/keys", listJSONKeysHandle)
 	router.GET("/generate", generateJSONHandle)
 	router.POST("/find", findValueHandle)
-	router.POST("/convert", convertHandle)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
